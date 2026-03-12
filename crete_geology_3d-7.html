@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Κρήτη · Geological Map 3D</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@latest/Build/Cesium/Widgets/widgets.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;1,400&family=Inconsolata:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --bg:     #111009;
+  --panel:  rgba(14,13,8,0.95);
+  --border: rgba(196,168,88,0.28);
+  --gold:   #c4a858;
+  /* text colors darkened from previous version */
+  --stone:  #786850;   /* was #b0a888 — darker for contrast on light backgrounds */
+  --muted:  #504838;   /* was #6a6450 */
+  --parch:  #c8c0a8;   /* was #f0e8d0 — less bright */
+  --rust:   #904828;
+  --sage:   #3a5030;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100vw;height:100vh;overflow:hidden;background:var(--bg);font-family:'Inconsolata',monospace;color:var(--parch)}
+#cesiumContainer{position:absolute;inset:0;width:100%;height:100%}
+
+/* corner marks */
+.mk{position:absolute;z-index:300;width:18px;height:18px;pointer-events:none}
+.mk::before,.mk::after{content:'';position:absolute;background:var(--gold);opacity:.5}
+.mk::before{width:100%;height:1px;top:0;left:0}
+.mk::after{width:1px;height:100%;top:0;left:0}
+.mk.tl{top:14px;left:14px}
+.mk.tr{top:14px;right:14px;transform:scaleX(-1)}
+.mk.bl{bottom:14px;left:14px;transform:scaleY(-1)}
+.mk.br{bottom:14px;right:14px;transform:scale(-1)}
+
+/* header */
+#hdr{position:absolute;top:0;left:0;right:0;z-index:200;padding:14px 20px 12px;display:flex;align-items:center;justify-content:space-between;pointer-events:none}
+#hdr h1{font-family:'Libre Baskerville',serif;font-size:1.3rem;font-weight:400;color:#e8e0c8;letter-spacing:.015em;line-height:1;text-shadow:0 1px 8px rgba(0,0,0,1),0 0 24px rgba(0,0,0,.9)}
+#hdr h1 i{font-style:italic;color:var(--gold)}
+#hdr .sub{font-size:.58rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);margin-top:5px;text-shadow:0 1px 6px rgba(0,0,0,1)}
+#hdr .coords{text-align:right;font-size:.72rem;color:var(--stone);letter-spacing:.06em;line-height:2;text-shadow:0 1px 6px rgba(0,0,0,1)}
+#hdr .coords b{color:#d4a840;font-weight:500}
+
+/* collapse bar */
+#collapseBtn{position:absolute;top:78px;right:16px;z-index:300;width:268px;height:28px;background:rgba(14,13,8,.88);border:1px solid var(--border);border-bottom:none;border-radius:1px 1px 0 0;display:flex;align-items:center;justify-content:space-between;padding:0 12px;cursor:pointer;backdrop-filter:blur(10px);transition:background .15s}
+#collapseBtn:hover{background:rgba(196,168,88,.12)}
+#collapseBtn .cb-label{font-size:.54rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+#collapseBtn .cb-arrow{font-size:.7rem;color:var(--gold);line-height:1;transition:transform .25s}
+#collapseBtn.collapsed .cb-arrow{transform:rotate(180deg)}
+
+/* panel */
+#panel{position:absolute;top:106px;right:16px;z-index:200;width:268px;background:var(--panel);border:1px solid var(--border);border-radius:0 0 1px 1px;backdrop-filter:blur(18px);box-shadow:0 14px 55px rgba(0,0,0,.75),inset 0 1px 0 rgba(196,168,88,.1);overflow:hidden;max-height:900px;transition:max-height .3s cubic-bezier(.4,0,.2,1),opacity .25s;animation:slideIn .5s cubic-bezier(.16,1,.3,1) both}
+#panel.collapsed{max-height:0;opacity:0}
+@keyframes slideIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+
+.sec{padding:13px 15px;border-bottom:1px solid var(--border)}
+.sec:last-child{border-bottom:none}
+.lbl{font-size:.56rem;letter-spacing:.22em;text-transform:uppercase;color:var(--gold);margin-bottom:10px;display:flex;align-items:center;gap:7px}
+.lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.tog{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:1px;cursor:pointer;border:1px solid transparent;transition:all .15s;margin-bottom:5px;user-select:none}
+.tog:last-child{margin-bottom:0}
+.tog:hover{background:rgba(196,168,88,.06);border-color:var(--border)}
+.tog.on{background:rgba(196,168,88,.1);border-color:rgba(196,168,88,.32)}
+.pip{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--muted);flex-shrink:0;transition:all .15s}
+.tog.on .pip{background:var(--gold);border-color:var(--gold);box-shadow:0 0 5px var(--gold)}
+.tog span{font-size:.68rem;color:var(--stone);transition:color .15s}
+.tog.on span{color:var(--parch)}
+
+.sr{display:flex;align-items:center;gap:7px;margin-top:9px}
+.sr .sl{font-size:.6rem;color:var(--muted);width:76px;flex-shrink:0}
+.sr .sv{font-size:.6rem;color:var(--gold);width:42px;text-align:right;flex-shrink:0}
+
+input[type=range]{flex:1;-webkit-appearance:none;height:2px;background:rgba(196,168,88,.2);border-radius:1px;outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:var(--gold);border:2px solid var(--bg);box-shadow:0 0 0 1px var(--gold);transition:transform .13s;cursor:pointer}
+input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3)}
+
+.detail-box{padding:11px 12px;background:rgba(196,168,88,.04);border:1px solid rgba(196,168,88,.16);border-radius:1px}
+.detail-box .dt{font-size:.56rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
+
+/* slider row with min/max labels — fixed overflow */
+.detail-row{display:flex;align-items:center;gap:6px}
+.detail-row .edge{font-size:.56rem;color:var(--muted);flex-shrink:0;width:22px}
+.detail-row .edge.right{text-align:right}
+
+.bsel{width:100%;background:rgba(196,168,88,.05);border:1px solid var(--border);border-radius:1px;color:var(--parch);font-family:'Inconsolata',monospace;font-size:.67rem;padding:7px 9px;outline:none;cursor:pointer;margin-top:5px}
+.bsel:focus{border-color:var(--gold)}
+.bsel option{background:#0e0d08}
+
+/* compass */
+#compass{position:absolute;bottom:58px;left:20px;z-index:200;width:80px;height:80px;cursor:pointer;filter:drop-shadow(0 2px 10px rgba(0,0,0,.85))}
+#compass:hover{filter:drop-shadow(0 2px 14px rgba(196,168,88,.5))}
+
+/* status */
+#bot{position:absolute;bottom:14px;left:20px;z-index:200;pointer-events:none}
+#statusLine{display:inline-flex;align-items:center;gap:7px;font-size:.62rem;color:var(--stone);letter-spacing:.06em;background:rgba(14,13,8,.8);border:1px solid var(--border);padding:6px 12px;border-radius:1px;backdrop-filter:blur(8px)}
+.sd{width:6px;height:6px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.sd.ok{background:var(--sage)}
+.sd.busy{background:var(--gold);animation:pulse .9s ease-in-out infinite}
+.sd.err{background:var(--rust)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+
+.cesium-widget-credits,.cesium-credit-logoContainer,.cesium-credit-textContainer{display:none!important}
+.cesium-viewer-toolbar{display:none!important}
+</style>
+</head>
+<body>
+
+<div id="cesiumContainer"></div>
+<div class="mk tl"></div><div class="mk tr"></div><div class="mk bl"></div><div class="mk br"></div>
+
+<!-- HEADER -->
+<div id="hdr">
+  <div>
+    <h1><i>Κρήτη</i> — Geological Map 3D</h1>
+    <div class="sub">EAGME · Hellenic Geological Survey · 1:50 000 · WMTS</div>
+  </div>
+  <div class="coords">
+    LAT <b id="cLat">—</b><br>
+    LON <b id="cLon">—</b><br>
+    CAM <b id="cAlt">—</b>
+  </div>
+</div>
+
+<!-- COLLAPSE BAR -->
+<div id="collapseBtn" onclick="window.uiTogglePanel()">
+  <span class="cb-label">Controlli</span>
+  <span class="cb-arrow">▲</span>
+</div>
+
+<!-- PANEL -->
+<div id="panel">
+
+  <div class="sec">
+    <div class="lbl">Base · ArcGIS Hillshade</div>
+    <div class="tog on" id="togHS" onclick="window.uiToggleHS()">
+      <div class="pip"></div><span>World Hillshade (free · lv.24)</span>
+    </div>
+    <div class="sr">
+      <span class="sl">Luminosità</span>
+      <input type="range" id="slBri" min="0.3" max="2" step="0.05" value="1.1"
+        oninput="window.hsLyr&&(window.hsLyr.brightness=+this.value);
+                 document.getElementById('vBri').textContent=parseFloat(this.value).toFixed(2)"/>
+      <span class="sv" id="vBri">1.10</span>
+    </div>
+    <div class="sr">
+      <span class="sl">Contrasto</span>
+      <input type="range" id="slCon" min="0.3" max="2.5" step="0.05" value="1.2"
+        oninput="window.hsLyr&&(window.hsLyr.contrast=+this.value);
+                 document.getElementById('vCon').textContent=parseFloat(this.value).toFixed(2)"/>
+      <span class="sv" id="vCon">1.20</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="lbl">Terrain 3D · ArcGIS</div>
+    <div class="tog on" id="togTer" onclick="window.uiToggleTerrain()">
+      <div class="pip"></div><span>World Elevation 3D</span>
+    </div>
+    <div class="sr">
+      <span class="sl">Esagerazione</span>
+      <input type="range" id="slExag" min="1" max="6" step="0.1" value="2"
+        oninput="window.uiSetExag(this.value)"/>
+      <span class="sv" id="vExag">2.0×</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="lbl">WMTS Geologico · EAGME</div>
+    <div class="tog on" id="togGeo" onclick="window.uiToggleGeo()">
+      <div class="pip"></div><span>Geol50k_Tiles · pre-cached</span>
+    </div>
+    <div class="sr">
+      <span class="sl">Opacità</span>
+      <input type="range" id="slAlpha" min="0" max="1" step="0.01" value="0.75"
+        oninput="window.uiSetGeoAlpha(this.value)"/>
+      <span class="sv" id="vAlpha">75%</span>
+    </div>
+    <div class="sr">
+      <span class="sl">Saturazione</span>
+      <input type="range" id="slSat" min="0.5" max="3" step="0.05" value="1.3"
+        oninput="window.geoLyr&&(window.geoLyr.saturation=+this.value);
+                 document.getElementById('vSat').textContent=parseFloat(this.value).toFixed(2)"/>
+      <span class="sv" id="vSat">1.30</span>
+    </div>
+    <div style="margin-top:10px">
+      <div class="lbl" style="margin-bottom:5px">Blend Mode</div>
+      <select class="bsel" id="selBlend" onchange="window.uiBlend(this.value)">
+        <option value="multiply" selected>✦ Moltiplica (Multiply)</option>
+        <option value="darken">Scurisci (Darken)</option>
+        <option value="overlay">Overlay</option>
+        <option value="colorburn">Color Burn</option>
+        <option value="screen">Screen</option>
+        <option value="normal">Normale</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="detail-box">
+      <div class="dt">Livello di Dettaglio</div>
+      <!-- min/max labels inline with slider, no overflow -->
+      <div class="detail-row">
+        <span class="edge">min</span>
+        <input type="range" id="slDetail" min="0" max="100" step="1" value="50"
+          oninput="window.uiSetDetail(+this.value)"/>
+        <span class="edge right">max</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- COMPASS — 80×80, centro in 40,40 -->
+<svg id="compass" viewBox="0 0 80 80" onclick="window.uiNorthUp()" title="Clicca per orientare a Nord">
+  <!-- outer ring -->
+  <circle cx="40" cy="40" r="37" fill="rgba(14,13,8,.85)" stroke="rgba(196,168,88,.4)" stroke-width="1.2"/>
+  <!-- inner ring subtle -->
+  <circle cx="40" cy="40" r="30" fill="none" stroke="rgba(196,168,88,.12)" stroke-width="0.8"/>
+  <!-- tick marks at cardinals -->
+  <g stroke="rgba(196,168,88,.45)" stroke-width="1">
+    <line x1="40" y1="5"  x2="40" y2="12"/>
+    <line x1="40" y1="68" x2="40" y2="75"/>
+    <line x1="5"  y1="40" x2="12" y2="40"/>
+    <line x1="68" y1="40" x2="75" y2="40"/>
+  </g>
+  <!-- cardinal letters -->
+  <text x="40" y="23"   text-anchor="middle" dominant-baseline="middle" font-family="Inconsolata,monospace" font-size="9"  font-weight="600" fill="#c4a858">N</text>
+  <text x="40" y="58"   text-anchor="middle" dominant-baseline="middle" font-family="Inconsolata,monospace" font-size="8"  fill="#504838">S</text>
+  <text x="58" y="41.5" text-anchor="middle" dominant-baseline="middle" font-family="Inconsolata,monospace" font-size="8"  fill="#504838">E</text>
+  <text x="22" y="41.5" text-anchor="middle" dominant-baseline="middle" font-family="Inconsolata,monospace" font-size="8"  fill="#504838">W</text>
+  <!-- needle: north=red, south=dark, rotates around exact center 40,40 -->
+  <g id="compass-needle">
+    <polygon points="40,11 44,40 40,34 36,40" fill="#c04030" opacity=".92"/>
+    <polygon points="40,69 44,40 40,46 36,40" fill="#504838" opacity=".75"/>
+    <circle cx="40" cy="40" r="3.5" fill="rgba(14,13,8,.95)" stroke="rgba(196,168,88,.6)" stroke-width="1.2"/>
+  </g>
+</svg>
+
+<!-- STATUS -->
+<div id="bot">
+  <div id="statusLine">
+    <div class="sd busy" id="sd"></div>
+    <span id="st">Inizializzazione…</span>
+  </div>
+</div>
+
+<script>
+window.CESIUM_BASE_URL = 'https://cdn.jsdelivr.net/npm/cesium@latest/Build/Cesium/';
+</script>
+<script src="https://cdn.jsdelivr.net/npm/cesium@latest/Build/Cesium/Cesium.js"></script>
+<script>
+(async () => {
+'use strict';
+
+const $ = id => document.getElementById(id);
+const setStatus = (state, msg) => {
+  $('sd').className = 'sd ' + state;
+  $('st').textContent = msg;
+};
+
+// ── Ion silence ──────────────────────────────────────────────────
+Cesium.Ion.defaultAccessToken = '';
+
+// ── Terrain ──────────────────────────────────────────────────────
+const ellipsoidTerrain = new Cesium.EllipsoidTerrainProvider();
+let arcgisTerrain = ellipsoidTerrain;
+try {
+  arcgisTerrain = await Cesium.ArcGISTiledElevationTerrainProvider.fromUrl(
+    'https://elevation3d.arcgis.com/arcgis/rest/services/WorldElevation3D/Terrain3D/ImageServer'
+  );
+} catch(e) { console.warn('Terrain fallback:', e.message); }
+
+// ── Viewer ───────────────────────────────────────────────────────
+const viewer = new Cesium.Viewer('cesiumContainer', {
+  imageryProvider:      false,
+  terrainProvider:      arcgisTerrain,
+  baseLayerPicker:      false,
+  navigationHelpButton: false,
+  sceneModePicker:      false,
+  geocoder:             false,
+  homeButton:           false,
+  fullscreenButton:     false,
+  timeline:             false,
+  animation:            false,
+  infoBox:              false,
+  selectionIndicator:   false,
+  creditContainer:      document.createElement('div'),
+  requestRenderMode:    false,
+});
+
+const { scene, camera } = viewer;
+const globe = scene.globe;
+
+// Performance settings
+scene.verticalExaggeration   = 2.0;
+globe.enableLighting          = true;
+scene.fog.enabled             = true;
+scene.fog.density             = 0.0001;
+scene.skyAtmosphere.show      = true;
+scene.skyBox.show             = false;
+scene.backgroundColor         = Cesium.Color.fromCssColorString('#0d0c08');
+viewer.clock.currentTime      = Cesium.JulianDate.fromIso8601('2024-07-18T08:00:00Z');
+// Limit concurrent tile requests to ease server load
+Cesium.RequestScheduler.maximumRequestsPerServer = 6; // default 18 — reduce pressure
+globe.maximumScreenSpaceError = 2;   // start at Cesium default
+globe.tileCacheSize           = 300; // conservative start — slider adjusts this
+
+// ── Hillshade layer ───────────────────────────────────────────────
+window.hsLyr = null;
+try {
+  window.hsLyr = viewer.imageryLayers.addImageryProvider(
+    await Cesium.ArcGisMapServerImageryProvider.fromUrl(
+      'https://services.arcgisonline.com/arcgis/rest/services/Elevation/World_Hillshade/MapServer',
+      { enablePickFeatures: false, maximumLevel: 24 }
+    )
+  );
+  window.hsLyr.brightness = 1.1;
+  window.hsLyr.contrast   = 1.2;
+  window.hsLyr.saturation = 0.0;
+  setStatus('busy', 'Hillshade OK — caricamento WMTS…');
+} catch(e) { setStatus('err', 'Hillshade: ' + e.message); }
+
+// ── WMTS geological layer ─────────────────────────────────────────
+window.geoLyr   = null;
+window.geoAlpha = 0.75;
+
+function loadGeoLayer() {
+  if (window.geoLyr) { viewer.imageryLayers.remove(window.geoLyr, true); window.geoLyr = null; }
+  setStatus('busy', 'Caricamento WMTS geologico…');
+  try {
+    window.geoLyr = viewer.imageryLayers.addImageryProvider(
+      new Cesium.WebMapTileServiceImageryProvider({
+        url:             'https://geoportal.eagme.gr/ogc/rest/services/WMS/Geol50k_Tiles/MapServer/WMTS',
+        layer:           'Geol50k_Tiles',
+        style:           'default',
+        tileMatrixSetID: 'GoogleMapsCompatible',
+        format:          'image/png',
+        maximumLevel:    19,
+        credit:          new Cesium.Credit('EAGME – Geological Survey of Greece'),
+      })
+    );
+    window.geoLyr.alpha      = window.geoAlpha;
+    window.geoLyr.saturation = parseFloat($('slSat').value);
+    applyBlend($('selBlend').value);
+  } catch(e) {
+    setStatus('err', 'WMTS: ' + e.message);
+    console.error(e);
+  }
+}
+loadGeoLayer();
+
+// ── Blend modes ───────────────────────────────────────────────────
+function applyBlend(mode) {
+  const lyr = window.geoLyr;
+  if (!lyr) return;
+  const sat = parseFloat($('slSat').value);
+  // reset
+  lyr.colorToAlpha = undefined;
+  lyr.colorToAlphaThreshold = 0.004;
+  switch (mode) {
+    case 'multiply':
+      lyr.colorToAlpha = Cesium.Color.WHITE; lyr.colorToAlphaThreshold = 0.09;
+      lyr.brightness = 0.80; lyr.contrast = 1.40; lyr.saturation = sat; break;
+    case 'darken':
+      lyr.colorToAlpha = Cesium.Color.WHITE; lyr.colorToAlphaThreshold = 0.14;
+      lyr.brightness = 0.88; lyr.contrast = 1.15; lyr.saturation = sat; break;
+    case 'overlay':
+      lyr.brightness = 1.0; lyr.contrast = 1.75; lyr.saturation = sat * 1.15; break;
+    case 'colorburn':
+      lyr.colorToAlpha = Cesium.Color.WHITE; lyr.colorToAlphaThreshold = 0.07;
+      lyr.brightness = 0.65; lyr.contrast = 1.65; lyr.saturation = sat * 1.1; break;
+    case 'screen':
+      lyr.colorToAlpha = Cesium.Color.BLACK; lyr.colorToAlphaThreshold = 0.05;
+      lyr.brightness = 1.20; lyr.contrast = 0.92; lyr.saturation = sat; break;
+    default:
+      lyr.brightness = 1.0; lyr.contrast = 1.0; lyr.saturation = sat;
+  }
+}
+
+// ── SSE slider: exponential 16 → 0.5 ─────────────────────────────
+function sliderToSSE(v) {
+  return 16 * Math.pow(0.5 / 16, v / 100);
+}
+
+// ── Compass: update needle every animation frame ──────────────────
+const needle = $('compass-needle');
+let lastHeading = null;
+viewer.scene.postRender.addEventListener(() => {
+  const h = camera.heading;
+  if (lastHeading === null || Math.abs(h - lastHeading) > 0.005) {
+    lastHeading = h;
+    const deg = Cesium.Math.toDegrees(h).toFixed(2);
+    // rotate(angle, cx, cy) — SVG attribute form, guaranteed to rotate around center 40,40
+    needle.setAttribute('transform', `rotate(${deg},40,40)`);
+  }
+});
+
+// ── Mouse coords ──────────────────────────────────────────────────
+const handler = new Cesium.ScreenSpaceEventHandler(viewer.canvas);
+handler.setInputAction(e => {
+  const pos = camera.pickEllipsoid(e.endPosition);
+  if (pos) {
+    const c = Cesium.Cartographic.fromCartesian(pos);
+    $('cLat').textContent = Cesium.Math.toDegrees(c.latitude).toFixed(5) + '°';
+    $('cLon').textContent = Cesium.Math.toDegrees(c.longitude).toFixed(5) + '°';
+    $('cAlt').textContent = (camera.positionCartographic.height / 1000).toFixed(1) + ' km';
+  }
+}, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+// ── Tile progress ─────────────────────────────────────────────────
+globe.tileLoadProgressEvent.addEventListener(n => {
+  if (n === 0) setStatus('ok', 'Pronto');
+  else         setStatus('busy', `Caricamento… ${n} tile`);
+});
+
+// ── Initial camera ────────────────────────────────────────────────
+camera.setView({
+  destination: Cesium.Cartesian3.fromDegrees(24.88, 35.22, 280000),
+  orientation: { heading: 0, pitch: Cesium.Math.toRadians(-52), roll: 0 },
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  UI CALLBACKS (exposed to window for HTML onclick)
+// ══════════════════════════════════════════════════════════════════
+window.uiToggleHS = () => {
+  if (!window.hsLyr) return;
+  window.hsLyr.show = !window.hsLyr.show;
+  $('togHS').classList.toggle('on', window.hsLyr.show);
+};
+
+let terrainOn = true;
+window.uiToggleTerrain = () => {
+  terrainOn = !terrainOn;
+  viewer.terrainProvider = terrainOn ? arcgisTerrain : ellipsoidTerrain;
+  $('togTer').classList.toggle('on', terrainOn);
+};
+
+window.uiSetExag = v => {
+  scene.verticalExaggeration = parseFloat(v);
+  $('vExag').textContent = parseFloat(v).toFixed(1) + '×';
+};
+
+window.uiToggleGeo = () => {
+  if (!window.geoLyr) return;
+  window.geoLyr.show = !window.geoLyr.show;
+  $('togGeo').classList.toggle('on', window.geoLyr.show);
+};
+
+window.uiSetGeoAlpha = v => {
+  window.geoAlpha = parseFloat(v);
+  if (window.geoLyr) window.geoLyr.alpha = window.geoAlpha;
+  $('vAlpha').textContent = Math.round(window.geoAlpha * 100) + '%';
+};
+
+window.uiBlend = mode => applyBlend(mode);
+
+window.uiSetDetail = v => {
+  globe.maximumScreenSpaceError = sliderToSSE(v);
+  // Scale cache: 100 at min, 1000 at max
+  globe.tileCacheSize = Math.round(100 + v * 9);
+};
+
+let panelOpen = true;
+window.uiTogglePanel = () => {
+  panelOpen = !panelOpen;
+  $('panel').classList.toggle('collapsed', !panelOpen);
+  $('collapseBtn').classList.toggle('collapsed', !panelOpen);
+};
+
+// North-up button on compass click
+window.uiNorthUp = () => {
+  camera.flyTo({
+    destination: camera.positionWC,
+    orientation: { heading: 0, pitch: camera.pitch, roll: 0 },
+    duration: 0.8,
+  });
+};
+
+})();
+</script>
+</body>
+</html>
