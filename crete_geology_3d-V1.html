@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title> GREECE · Geological Map Viewer 3D 1:50000</title>
+<title> GREECE · Geological Map Viewer 3D . 1:50000</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/cesium@latest/Build/Cesium/Widgets/widgets.css"/>
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;1,400&family=Inconsolata:wght@300;400;500&display=swap" rel="stylesheet"/>
@@ -13,10 +13,9 @@
   --panel:  rgba(14,13,8,0.95);
   --border: rgba(196,168,88,0.28);
   --gold:   #c4a858;
-  /* text colors darkened from previous version */
-  --stone:  #786850;   /* was #b0a888 — darker for contrast on light backgrounds */
-  --muted:  #504838;   /* was #6a6450 */
-  --parch:  #c8c0a8;   /* was #f0e8d0 — less bright */
+  --stone:  #786850;   
+  --muted:  #504838;   
+  --parch:  #c8c0a8;   
   --rust:   #904828;
   --sage:   #3a5030;
 }
@@ -79,7 +78,7 @@ input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3)}
 .detail-box{padding:11px 12px;background:rgba(196,168,88,.04);border:1px solid rgba(196,168,88,.16);border-radius:1px}
 .detail-box .dt{font-size:.56rem;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
 
-/* slider row with min/max labels — fixed overflow */
+/* slider row with min/max labels */
 .detail-row{display:flex;align-items:center;gap:6px}
 .detail-row .edge{font-size:.56rem;color:var(--muted);flex-shrink:0;width:22px}
 .detail-row .edge.right{text-align:right}
@@ -125,7 +124,7 @@ input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3)}
 
 <!-- COLLAPSE BAR -->
 <div id="collapseBtn" onclick="window.uiTogglePanel()">
-  <span class="cb-label">Controlli</span>
+  <span class="cb-label">Control Menu</span>
   <span class="cb-arrow">▲</span>
 </div>
 
@@ -133,19 +132,19 @@ input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3)}
 <div id="panel">
 
   <div class="sec">
-    <div class="lbl">Base · ArcGIS Hillshade</div>
+    <div class="lbl">ArcGIS Hillshade</div>
     <div class="tog on" id="togHS" onclick="window.uiToggleHS()">
       <div class="pip"></div><span>World Hillshade </span>
     </div>
     <div class="sr">
-      <span class="sl">Luminosità</span>
+      <span class="sl">Luminosity</span>
       <input type="range" id="slBri" min="0.3" max="2" step="0.05" value="1.1"
         oninput="window.hsLyr&&(window.hsLyr.brightness=+this.value);
                  document.getElementById('vBri').textContent=parseFloat(this.value).toFixed(2)"/>
       <span class="sv" id="vBri">1.10</span>
     </div>
     <div class="sr">
-      <span class="sl">Contrasto</span>
+      <span class="sl">Contrast</span>
       <input type="range" id="slCon" min="0.3" max="2.5" step="0.05" value="1.2"
         oninput="window.hsLyr&&(window.hsLyr.contrast=+this.value);
                  document.getElementById('vCon').textContent=parseFloat(this.value).toFixed(2)"/>
@@ -154,12 +153,12 @@ input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3)}
   </div>
 
   <div class="sec">
-    <div class="lbl">Terrain 3D · ArcGIS</div>
+    <div class="lbl">Copernicus Terrain · ArcGIS</div>
     <div class="tog on" id="togTer" onclick="window.uiToggleTerrain()">
       <div class="pip"></div><span>World Elevation 3D</span>
     </div>
     <div class="sr">
-      <span class="sl">Esagerazione</span>
+      <span class="sl">Elevation</span>
       <input type="range" id="slExag" min="1" max="6" step="0.1" value="2"
         oninput="window.uiSetExag(this.value)"/>
       <span class="sv" id="vExag">2.0×</span>
@@ -169,16 +168,16 @@ input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3)}
   <div class="sec">
     <div class="lbl">WMTS Geology · EAGME</div>
     <div class="tog on" id="togGeo" onclick="window.uiToggleGeo()">
-      <div class="pip"></div><span>Geol50k_Tiles · pre-cached</span>
+      <div class="pip"></div><span>Geology-50k</span>
     </div>
     <div class="sr">
-      <span class="sl">Opacità</span>
+      <span class="sl">Opacity</span>
       <input type="range" id="slAlpha" min="0" max="1" step="0.01" value="0.75"
         oninput="window.uiSetGeoAlpha(this.value)"/>
       <span class="sv" id="vAlpha">75%</span>
     </div>
     <div class="sr">
-      <span class="sl">Saturazione</span>
+      <span class="sl">Saturation</span>
       <input type="range" id="slSat" min="0.5" max="3" step="0.05" value="1.3"
         oninput="window.geoLyr&&(window.geoLyr.saturation=+this.value);
                  document.getElementById('vSat').textContent=parseFloat(this.value).toFixed(2)"/>
@@ -187,12 +186,12 @@ input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3)}
     <div style="margin-top:10px">
       <div class="lbl" style="margin-bottom:5px">Blend Mode</div>
       <select class="bsel" id="selBlend" onchange="window.uiBlend(this.value)">
-        <option value="multiply" selected>✦ Moltiplica (Multiply)</option>
-        <option value="darken">Scurisci (Darken)</option>
+        <option value="multiply" selected>Multiply</option>
+        <option value="darken">Darken</option>
         <option value="overlay">Overlay</option>
         <option value="colorburn">Color Burn</option>
         <option value="screen">Screen</option>
-        <option value="normal">Normale</option>
+        <option value="normal">Normal</option>
       </select>
     </div>
   </div>
@@ -200,7 +199,6 @@ input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3)}
   <div class="sec">
     <div class="detail-box">
       <div class="dt">Livello di Dettaglio</div>
-      <!-- min/max labels inline with slider, no overflow -->
       <div class="detail-row">
         <span class="edge">min</span>
         <input type="range" id="slDetail" min="0" max="100" step="1" value="50"
@@ -242,7 +240,7 @@ input[type=range]:hover::-webkit-slider-thumb{transform:scale(1.3)}
 <div id="bot">
   <div id="statusLine">
     <div class="sd busy" id="sd"></div>
-    <span id="st">Inizializzazione…</span>
+    <span id="st">Starting...</span>
   </div>
 </div>
 
@@ -411,8 +409,8 @@ handler.setInputAction(e => {
 
 // ── Tile progress ─────────────────────────────────────────────────
 globe.tileLoadProgressEvent.addEventListener(n => {
-  if (n === 0) setStatus('ok', 'Pronto');
-  else         setStatus('busy', `Caricamento… ${n} tile`);
+  if (n === 0) setStatus('Ok', 'Ready');
+  else         setStatus('busy', `Loading… ${n} tile`);
 });
 
 // ── Initial camera ────────────────────────────────────────────────
